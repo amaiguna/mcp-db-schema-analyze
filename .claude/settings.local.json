@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx biome:*)",
+      "Bash(npx vitest:*)",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"const { z } = require\\('zod'\\); console.log\\(typeof z.string\\);\")",
+      "Bash(npm run:*)"
     ]
   }
 }
