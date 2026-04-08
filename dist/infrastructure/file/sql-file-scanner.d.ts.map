@@ -1,1 +1,0 @@
-{"version":3,"file":"sql-file-scanner.d.ts","sourceRoot":"","sources":["../../../src/infrastructure/file/sql-file-scanner.ts"],"names":[],"mappings":"AAGA,MAAM,WAAW,YAAY;IAC5B,QAAQ,EAAE,GAAG,CAAC,MAAM,EAAE,MAAM,CAAC,CAAC;IAC9B,QAAQ,EAAE,GAAG,CAAC,MAAM,EAAE,MAAM,CAAC,CAAC;CAC9B;AAED;;;;;GAKG;AACH,wBAAgB,WAAW,CAAC,IAAI,EAAE,MAAM,EAAE,GAAG,YAAY,CAcxD"}
