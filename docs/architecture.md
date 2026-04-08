@@ -23,7 +23,7 @@ src/
 
   application/
     schema-registry.ts      -- 遅延ロード + キャッシュによるスキーマ参照 (MCPサーバーが使う)
-    prepare-sql.ts          -- SQLファイル群 → テーブル単位に正規化して出力するユースケース
+    prepare-sql.ts          -- SQLファイル群 → カテゴリ別・名前単位に正規化して出力するユースケース
 
   infrastructure/
     parser/
@@ -36,15 +36,10 @@ src/
 
   interface/
     mcp/
-      server.ts             -- MCPサーバー初期化・ツール登録
-      tools/
-        list-tables.ts      -- テーブル一覧
-        describe-table.ts   -- テーブル詳細
-        list-relations.ts   -- リレーション一覧 (FK確定 + 同名カラム推定)
-        find-shared-columns.ts -- テーブル間の同名カラム検出
-        list-master-data.ts -- マスタデータ参照
+      server.ts             -- MCPサーバー初期化・ツール登録 (9ツール)
     cli/
       prepare.ts            -- prepare コマンドのエントリポイント
+      config.ts             -- JSON設定ファイルの読み込み・パス正規化
 
   index.ts                  -- MCPサーバー起動エントリポイント
   cli.ts                    -- CLI エントリポイント
@@ -81,21 +76,24 @@ Schema (集約ルート)
 ```
 1. prepare (前処理)
    元のSQLファイル群 (混在・1ファイル等どんな構成でもOK)
-     → パース → DDL/DML分類 → テーブル単位に分割
-     → output/ddl/users.sql, output/ddl/orders.sql, output/dml/roles.sql ...
+     → パース → 4カテゴリに分類 (DDL/DML/SEQUENCE/FUNCTION)
+     → カテゴリ内で名前単位に1ファイルに分割
+     → output/ddl/users.sql, output/dml/roles.sql,
+       output/sequences/users_id_seq.sql, output/functions/get_user_count.sql ...
 
 2. MCP サーバー (prepare 済みディレクトリを参照)
-   SQL_DIRS → テーブル単位のファイルを遅延ロード
+   SQL_DIRS → 名前単位のファイルを遅延ロード
 ```
 
-prepare によりテーブル単位1ファイルに正規化されていることが、遅延ロードの前提条件。
+prepare により名前単位1ファイルに正規化されていることが、遅延ロードの前提条件。
 
 ### MCPサーバー起動時 (軽量)
 
 ```
 SQL_DIRS 環境変数
   → sql-file-scanner がディレクトリをスキャン
-  → ファイル名からテーブル名→ファイルパスの対応表を構築
+  → ディレクトリ名で分類 (ddl/dml/sequences/functions)
+  → ファイル名から名前→ファイルパスの対応表を構築
   → SchemaRegistry がこの対応表を保持
   (この時点ではSQLのパースは行わない)
 ```
@@ -109,6 +107,10 @@ SQL_DIRS 環境変数
     → キャッシュに格納して返す
     (他テーブルには触れない)
 
+シーケンス/関数の参照 (getSequence, getFunction):
+  SchemaRegistry
+    → 対象ファイルをそのまま読み取って返す (パース不要、SQL定義テキストで返す)
+
 横断操作 (getRelationsForTable, findSharedColumns):
   SchemaRegistry
     → 未パースのテーブルを全パース (初回のみ)
@@ -119,11 +121,12 @@ SQL_DIRS 環境変数
 ### prepare コマンド
 
 ```
---input ディレクトリ
-  → sql-file-reader がファイル群を再帰的に読み取り
+--input ディレクトリ (または --config で設定ファイル指定)
+  → sql-file-reader がファイル群を再帰的に読み取り (空ファイルはスキップ)
   → sql-parser が各ファイルをAST化
-  → prepare-sql がステートメントをDDL/DMLに分類・テーブル単位に集約
-  → sql-file-writer が --output/ddl/, --output/dml/ に書き出し
+  → prepare-sql がステートメントを4カテゴリに分類・名前単位に集約
+  → sql-file-writer が --output/ddl/, --output/dml/,
+    --output/sequences/, --output/functions/ に書き出し
 ```
 
 ## SchemaRegistry
@@ -134,16 +137,24 @@ MCPサーバーが直接利用する application 層のクラス。
 SchemaRegistry
 ├── ddlFiles: Map<tableName, filePath>       -- 起動時にファイル名から構築 (パース不要)
 ├── dmlFiles: Map<tableName, filePath>
+├── sequenceFiles: Map<seqName, filePath>
+├── functionFiles: Map<funcName, filePath>
 │
 ├── tableCache: Map<tableName, Table>        -- 遅延パース結果のキャッシュ
-├── relationsCache: Relation[] | null        -- 横断操作時に一括構築
 ├── masterDataCache: Map<tableName, MasterData>
+├── fullSchema: Schema | null                -- 横断操作時に一括構築
 │
 │  -- 単テーブル操作 (1ファイルだけパース) --
 ├── getTableNames(): string[]                -- ファイル一覧から即座に返す
 ├── getTable(name): Promise<Table | undefined>
 ├── getMasterDataForTable(name): Promise<MasterData | undefined>
 ├── getMasterDataTables(): string[]          -- ファイル一覧から即座に返す
+│
+│  -- シーケンス/関数 (ファイル読み取りのみ、パース不要) --
+├── getSequenceNames(): string[]
+├── getSequence(name): string | undefined
+├── getFunctionNames(): string[]
+├── getFunction(name): string | undefined
 │
 │  -- 横断操作 (初回は全パース、以降キャッシュ) --
 ├── getRelationsForTable(name): Promise<Relation[]>
@@ -154,10 +165,10 @@ SchemaRegistry
 
 ### prepare を前段に必須とする理由
 
-遅延ロードは「テーブル名 = ファイル名」の対応が取れて初めて機能する。
+遅延ロードは「名前 = ファイル名」の対応が取れて初めて機能する。
 元のSQLファイル群は1ファイルに全テーブルが入っている、DDLとDMLが混在している等
-様々な構成がありうるため、ファイル名からテーブル名を特定できない。
-prepare でテーブル単位1ファイルに正規化することで、この前提を満たす。
+様々な構成がありうるため、ファイル名から名前を特定できない。
+prepare でカテゴリ別・名前単位1ファイルに正規化することで、この前提を満たす。
 
 ### なぜ Schema を集約ルートに残すか
 
@@ -196,7 +207,8 @@ tests/
   infrastructure/
     parser/             -- パーサの単体テスト (SQL文字列 → ドメインモデル)
   interface/
-    mcp/                -- MCPツールの統合テスト (SchemaRegistry のモックで十分)
+    mcp/                -- MCPツールの統合テスト (InMemoryTransport で実ツール呼び出し)
+    cli/                -- CLI引数パース + 設定ファイル読み込みのテスト
 ```
 
 - TDD: テストを先に書き、実装を後から埋める

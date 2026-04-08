@@ -1,0 +1,4 @@
+{
+	"input": ["./raw-sql"],
+	"output": "./prepared"
+}

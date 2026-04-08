@@ -196,3 +196,90 @@ describe("prepareSql - 複数ファイルに分散したDDLの統合", () => {
 		expect(orderItemsSql).toContain("fk_order_items_order_id");
 	});
 });
+
+// ---------------------------------------------------------------------------
+// 空SQLファイルのスキップ
+//
+// 空ファイルやコメントのみのファイルが混在しても、エラーにならず
+// 有効なSQLだけが処理されることを検証する。
+// ---------------------------------------------------------------------------
+
+describe("prepareSql - 空SQLファイルのスキップ", () => {
+	beforeEach(() => {
+		fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
+	});
+
+	afterEach(() => {
+		fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
+	});
+
+	it("空ファイルやコメントのみのファイルが混在してもエラーにならない", async () => {
+		// with-empty/ には tables.sql, empty.sql, comment-only.sql がある
+		await prepareSql({
+			inputDirs: [`${FIXTURES_DIR}/with-empty`],
+			outputDir: OUTPUT_DIR,
+		});
+
+		// 有効なSQLだけが処理される
+		const ddlFiles = fs.readdirSync(path.join(OUTPUT_DIR, "ddl"));
+		expect(ddlFiles).toContain("users.sql");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// SEQUENCE / FUNCTION の前処理
+//
+// CREATE SEQUENCE, CREATE FUNCTION を DDL として分類し、
+// それぞれ独立したファイルに出力されることを検証する。
+// テーブルとは別の名前空間 (sequences/, functions/) に出力する。
+// ---------------------------------------------------------------------------
+
+describe("prepareSql - SEQUENCE / FUNCTION の前処理", () => {
+	beforeEach(() => {
+		fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
+	});
+
+	afterEach(() => {
+		fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
+	});
+
+	const SEQ_FUNC_DIR = `${FIXTURES_DIR}/with-seq-func`;
+
+	it("CREATE SEQUENCE を sequences/ ディレクトリに出力する", async () => {
+		await prepareSql({
+			inputDirs: [SEQ_FUNC_DIR],
+			outputDir: OUTPUT_DIR,
+		});
+
+		const seqDir = path.join(OUTPUT_DIR, "sequences");
+		expect(fs.existsSync(seqDir)).toBe(true);
+
+		const files = fs.readdirSync(seqDir);
+		expect(files).toContain("users_id_seq.sql");
+		expect(files).toContain("order_number_seq.sql");
+	});
+
+	it("CREATE FUNCTION を functions/ ディレクトリに出力する", async () => {
+		await prepareSql({
+			inputDirs: [SEQ_FUNC_DIR],
+			outputDir: OUTPUT_DIR,
+		});
+
+		const funcDir = path.join(OUTPUT_DIR, "functions");
+		expect(fs.existsSync(funcDir)).toBe(true);
+
+		const files = fs.readdirSync(funcDir);
+		expect(files).toContain("get_user_count.sql");
+		expect(files).toContain("get_active_users.sql");
+	});
+
+	it("テーブルとDMLは従来通り ddl/ と dml/ に出力される", async () => {
+		await prepareSql({
+			inputDirs: [SEQ_FUNC_DIR],
+			outputDir: OUTPUT_DIR,
+		});
+
+		expect(fs.existsSync(path.join(OUTPUT_DIR, "ddl", "users.sql"))).toBe(true);
+		expect(fs.existsSync(path.join(OUTPUT_DIR, "dml", "roles.sql"))).toBe(true);
+	});
+});

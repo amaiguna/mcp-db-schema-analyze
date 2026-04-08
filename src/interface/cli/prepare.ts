@@ -1,4 +1,5 @@
 import { type PrepareSqlOptions, prepareSql } from "../../application/prepare-sql.js";
+import { loadConfig } from "./config.js";
 
 export function parseArgs(argv: string[]): PrepareSqlOptions {
 	if (argv[0] !== "prepare") {
@@ -7,13 +8,25 @@ export function parseArgs(argv: string[]): PrepareSqlOptions {
 
 	let input: string | undefined;
 	let output: string | undefined;
+	let configPath: string | undefined;
 
 	for (let i = 1; i < argv.length; i++) {
 		if (argv[i] === "--input" && argv[i + 1]) {
 			input = argv[++i];
 		} else if (argv[i] === "--output" && argv[i + 1]) {
 			output = argv[++i];
+		} else if (argv[i] === "--config" && argv[i + 1]) {
+			configPath = argv[++i];
 		}
+	}
+
+	// --config がある場合、設定ファイルから読み込み (--input/--output で上書き可能)
+	if (configPath) {
+		const fromConfig = loadConfig(configPath);
+		return {
+			inputDirs: input ? input.split(",") : fromConfig.inputDirs,
+			outputDir: output ?? fromConfig.outputDir,
+		};
 	}
 
 	if (!input) {

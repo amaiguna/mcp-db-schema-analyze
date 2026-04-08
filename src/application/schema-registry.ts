@@ -9,6 +9,8 @@ import { DmlExtractor } from "../infrastructure/parser/dml-extractor.js";
 export class SchemaRegistry {
 	private readonly ddlFiles: Map<string, string>;
 	private readonly dmlFiles: Map<string, string>;
+	private readonly sequenceFiles: Map<string, string>;
+	private readonly functionFiles: Map<string, string>;
 
 	private readonly tableCache = new Map<string, Table>();
 	private readonly masterDataCache = new Map<string, MasterData>();
@@ -21,6 +23,8 @@ export class SchemaRegistry {
 		const index = scanSqlDirs(sqlDirs);
 		this.ddlFiles = index.ddlFiles;
 		this.dmlFiles = index.dmlFiles;
+		this.sequenceFiles = index.sequenceFiles;
+		this.functionFiles = index.functionFiles;
 	}
 
 	/** テーブル名一覧 (ファイル名から即座に返す、パース不要) */
@@ -71,6 +75,30 @@ export class SchemaRegistry {
 	async getRelationsForTable(name: string): Promise<Relation[]> {
 		const schema = await this.ensureFullSchema();
 		return schema.getRelationsForTable(name);
+	}
+
+	/** シーケンス名一覧 (ファイル名から即座に返す) */
+	getSequenceNames(): string[] {
+		return [...this.sequenceFiles.keys()].sort();
+	}
+
+	/** 関数名一覧 (ファイル名から即座に返す) */
+	getFunctionNames(): string[] {
+		return [...this.functionFiles.keys()].sort();
+	}
+
+	/** シーケンスのSQL定義を返す */
+	getSequence(name: string): string | undefined {
+		const filePath = this.sequenceFiles.get(name);
+		if (!filePath) return undefined;
+		return fs.readFileSync(filePath, "utf-8");
+	}
+
+	/** 関数のSQL定義を返す */
+	getFunction(name: string): string | undefined {
+		const filePath = this.functionFiles.get(name);
+		if (!filePath) return undefined;
+		return fs.readFileSync(filePath, "utf-8");
 	}
 
 	/** 横断操作: テーブル間の同名カラム検出 (初回は全テーブルパース) */

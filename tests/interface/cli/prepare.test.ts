@@ -31,11 +31,36 @@ describe("prepare CLI - 引数パース", () => {
 		});
 	});
 
-	it("--input が未指定の場合エラーになる", () => {
+	it("--config で設定ファイルからパスを読み取る", () => {
+		const configPath = `${FIXTURES_DIR}/config/mcp-db-schema.json`;
+		const args = parseArgs(["prepare", "--config", configPath]);
+
+		// 設定ファイルの相対パスが設定ファイル基準で解決される
+		expect(args.inputDirs).toHaveLength(1);
+		expect(args.outputDir).toBeDefined();
+	});
+
+	it("--config と --input/--output を同時指定すると引数が優先される", () => {
+		const configPath = `${FIXTURES_DIR}/config/mcp-db-schema.json`;
+		const args = parseArgs([
+			"prepare",
+			"--config",
+			configPath,
+			"--input",
+			"/override/in",
+			"--output",
+			"/override/out",
+		]);
+
+		expect(args.inputDirs).toEqual(["/override/in"]);
+		expect(args.outputDir).toBe("/override/out");
+	});
+
+	it("--input が未指定 (--configもなし) の場合エラーになる", () => {
 		expect(() => parseArgs(["prepare", "--output", "/out"])).toThrow("--input");
 	});
 
-	it("--output が未指定の場合エラーになる", () => {
+	it("--output が未指定 (--configもなし) の場合エラーになる", () => {
 		expect(() => parseArgs(["prepare", "--input", "/in"])).toThrow("--output");
 	});
 

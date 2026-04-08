@@ -13,12 +13,14 @@ import { createMcpServer } from "../../../src/interface/mcp/server";
 
 const DDL_DIR = new URL("../../fixtures/ddl", import.meta.url).pathname;
 const DML_DIR = new URL("../../fixtures/dml", import.meta.url).pathname;
+const SEQ_DIR = new URL("../../fixtures/sequences", import.meta.url).pathname;
+const FUNC_DIR = new URL("../../fixtures/functions", import.meta.url).pathname;
 
 let client: Client;
 let cleanup: () => Promise<void>;
 
 beforeAll(async () => {
-	const server = createMcpServer([DDL_DIR, DML_DIR]);
+	const server = createMcpServer([DDL_DIR, DML_DIR, SEQ_DIR, FUNC_DIR]);
 	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 
 	client = new Client({ name: "test-client", version: "0.0.1" });
@@ -141,5 +143,61 @@ describe("find-shared-columns ツール", () => {
 		// "id" がカラム名として含まれないことを確認 (テーブル名に含まれる可能性があるのでパース結果で判断)
 		// find-shared-columns の結果は構造化されるので、id がキーとして出ないことを確認
 		expect(text).not.toMatch(/\bid\b.*:.*\[/);
+	});
+});
+
+// === list-sequences ===
+
+describe("list-sequences ツール", () => {
+	it("シーケンス名の一覧を返す", async () => {
+		const result = await client.callTool({
+			name: "list-sequences",
+			arguments: {},
+		});
+
+		const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+		expect(text).toContain("users_id_seq");
+	});
+});
+
+// === describe-sequence ===
+
+describe("describe-sequence ツール", () => {
+	it("指定シーケンスの定義を返す", async () => {
+		const result = await client.callTool({
+			name: "describe-sequence",
+			arguments: { sequence_name: "users_id_seq" },
+		});
+
+		const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+		expect(text).toContain("users_id_seq");
+	});
+});
+
+// === list-functions ===
+
+describe("list-functions ツール", () => {
+	it("関数名の一覧を返す", async () => {
+		const result = await client.callTool({
+			name: "list-functions",
+			arguments: {},
+		});
+
+		const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+		expect(text).toContain("get_user_count");
+	});
+});
+
+// === describe-function ===
+
+describe("describe-function ツール", () => {
+	it("指定関数の定義を返す", async () => {
+		const result = await client.callTool({
+			name: "describe-function",
+			arguments: { function_name: "get_user_count" },
+		});
+
+		const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+		expect(text).toContain("get_user_count");
 	});
 });

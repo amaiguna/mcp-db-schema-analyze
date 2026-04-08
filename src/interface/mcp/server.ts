@@ -82,5 +82,53 @@ export function createMcpServer(sqlDirs: string[]): McpServer {
 		},
 	);
 
+	// --- list-sequences ---
+	server.tool("list-sequences", "シーケンス一覧を返す", async () => {
+		const names = registry.getSequenceNames();
+		return { content: [{ type: "text", text: JSON.stringify(names, null, 2) }] };
+	});
+
+	// --- describe-sequence ---
+	server.tool(
+		"describe-sequence",
+		"指定シーケンスのSQL定義を返す",
+		{ sequence_name: z.string().describe("シーケンス名") },
+		async ({ sequence_name }) => {
+			const sql = registry.getSequence(sequence_name);
+			if (!sql) {
+				return {
+					isError: true as const,
+					content: [
+						{ type: "text" as const, text: `シーケンス '${sequence_name}' が見つかりません` },
+					],
+				};
+			}
+			return { content: [{ type: "text", text: sql }] };
+		},
+	);
+
+	// --- list-functions ---
+	server.tool("list-functions", "関数一覧を返す", async () => {
+		const names = registry.getFunctionNames();
+		return { content: [{ type: "text", text: JSON.stringify(names, null, 2) }] };
+	});
+
+	// --- describe-function ---
+	server.tool(
+		"describe-function",
+		"指定関数のSQL定義を返す",
+		{ function_name: z.string().describe("関数名") },
+		async ({ function_name }) => {
+			const sql = registry.getFunction(function_name);
+			if (!sql) {
+				return {
+					isError: true as const,
+					content: [{ type: "text" as const, text: `関数 '${function_name}' が見つかりません` }],
+				};
+			}
+			return { content: [{ type: "text", text: sql }] };
+		},
+	);
+
 	return server;
 }
