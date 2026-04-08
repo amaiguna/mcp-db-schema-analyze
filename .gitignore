@@ -1,2 +1,21 @@
-.claude/**
-node_modules/**
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project-specific
+.claude/
+schema/
