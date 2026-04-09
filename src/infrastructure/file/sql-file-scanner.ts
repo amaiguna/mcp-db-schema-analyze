@@ -6,6 +6,7 @@ export interface SqlFileIndex {
 	dmlFiles: Map<string, string>;
 	sequenceFiles: Map<string, string>; // sequenceName → filePath
 	functionFiles: Map<string, string>; // functionName → filePath
+	metaFilePath: string | null; // meta.json のパス (存在しない場合 null)
 }
 
 /**
@@ -21,6 +22,8 @@ export function scanSqlDirs(dirs: string[]): SqlFileIndex {
 	const sequenceFiles = new Map<string, string>();
 	const functionFiles = new Map<string, string>();
 
+	let metaFilePath: string | null = null;
+
 	for (const dir of dirs) {
 		if (!fs.existsSync(dir)) {
 			throw new Error(`Directory not found: ${dir}`);
@@ -35,9 +38,15 @@ export function scanSqlDirs(dirs: string[]): SqlFileIndex {
 						? functionFiles
 						: ddlFiles;
 		collectSqlEntries(dir, target);
+
+		// 親ディレクトリに meta.json があれば記録
+		const candidateMeta = path.join(path.dirname(dir), "meta.json");
+		if (!metaFilePath && fs.existsSync(candidateMeta)) {
+			metaFilePath = candidateMeta;
+		}
 	}
 
-	return { ddlFiles, dmlFiles, sequenceFiles, functionFiles };
+	return { ddlFiles, dmlFiles, sequenceFiles, functionFiles, metaFilePath };
 }
 
 function collectSqlEntries(dir: string, target: Map<string, string>): void {

@@ -201,3 +201,20 @@ describe("describe-function ツール", () => {
 		expect(text).toContain("get_user_count");
 	});
 });
+
+// === get-table-meta ===
+
+describe("get-table-meta ツール", () => {
+	it("テーブル名とコメントのマッピングを返す", async () => {
+		const result = await client.callTool({
+			name: "get-table-meta",
+			arguments: {},
+		});
+
+		const text = (result.content as Array<{ type: string; text: string }>)[0].text;
+		const meta = JSON.parse(text);
+		expect(meta.tables.users.comment).toBe("ユーザー管理テーブル");
+		expect(meta.tables.orders.comment).toBe("注文テーブル");
+		expect(meta.tables.roles.comment).toBe("ロールマスタ");
+	});
+});

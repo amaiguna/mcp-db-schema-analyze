@@ -1,4 +1,7 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { deparse, parse } from "pgsql-parser";
+import type { TableMeta } from "../domain/model/types.js";
 import { readSqlFiles } from "../infrastructure/file/sql-file-reader.js";
 import { writeSqlFile } from "../infrastructure/file/sql-file-writer.js";
 
@@ -99,6 +102,20 @@ export async function prepareSql(options: PrepareSqlOptions): Promise<void> {
 		bucket.set(classified.name, stmts);
 	}
 
+	// テーブルコメントを収集
+	const tableComments = new Map<string, string>();
+	for (const stmtWrapper of allStmts) {
+		const stmt = stmtWrapper.stmt;
+		if (stmt.CommentStmt?.objtype === "OBJECT_TABLE") {
+			const items = stmt.CommentStmt.object?.List?.items ?? [];
+			const names = items.map((i: AstNode) => i.String?.str).filter(Boolean);
+			const tableName = names[names.length - 1];
+			if (tableName && stmt.CommentStmt.comment) {
+				tableComments.set(tableName, stmt.CommentStmt.comment);
+			}
+		}
+	}
+
 	// 各カテゴリを書き出し
 	for (const [category, nameMap] of buckets) {
 		const dir = `${options.outputDir}/${CATEGORY_DIRS[category]}`;
@@ -106,5 +123,20 @@ export async function prepareSql(options: PrepareSqlOptions): Promise<void> {
 			const sql = await deparse({ version, stmts });
 			writeSqlFile(dir, `${name}.sql`, `${sql.trim()}\n`);
 		}
+	}
+
+	// meta.json を出力 (テーブル名→コメントのマッピング)
+	const ddlBucket = buckets.get("ddl");
+	if (ddlBucket) {
+		const meta: TableMeta = { tables: {} };
+		for (const name of ddlBucket.keys()) {
+			meta.tables[name] = { comment: tableComments.get(name) ?? null };
+		}
+		fs.mkdirSync(options.outputDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(options.outputDir, "meta.json"),
+			`${JSON.stringify(meta, null, 2)}\n`,
+			"utf-8",
+		);
 	}
 }

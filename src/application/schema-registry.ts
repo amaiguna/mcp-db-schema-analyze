@@ -1,7 +1,13 @@
 import * as fs from "node:fs";
 import { Schema } from "../domain/model/schema.js";
 import type { FindSharedColumnsOptions } from "../domain/model/schema.js";
-import type { MasterData, Relation, SharedColumn, Table } from "../domain/model/types.js";
+import type {
+	MasterData,
+	Relation,
+	SharedColumn,
+	Table,
+	TableMeta,
+} from "../domain/model/types.js";
 import { scanSqlDirs } from "../infrastructure/file/sql-file-scanner.js";
 import { DdlExtractor } from "../infrastructure/parser/ddl-extractor.js";
 import { DmlExtractor } from "../infrastructure/parser/dml-extractor.js";
@@ -11,6 +17,7 @@ export class SchemaRegistry {
 	private readonly dmlFiles: Map<string, string>;
 	private readonly sequenceFiles: Map<string, string>;
 	private readonly functionFiles: Map<string, string>;
+	private readonly tableMeta: TableMeta | null;
 
 	private readonly tableCache = new Map<string, Table>();
 	private readonly masterDataCache = new Map<string, MasterData>();
@@ -25,6 +32,14 @@ export class SchemaRegistry {
 		this.dmlFiles = index.dmlFiles;
 		this.sequenceFiles = index.sequenceFiles;
 		this.functionFiles = index.functionFiles;
+		this.tableMeta = index.metaFilePath
+			? JSON.parse(fs.readFileSync(index.metaFilePath, "utf-8"))
+			: null;
+	}
+
+	/** テーブルメタ情報 (meta.json から即座に返す、パース不要) */
+	getTableMeta(): TableMeta | null {
+		return this.tableMeta;
 	}
 
 	/** テーブル名一覧 (ファイル名から即座に返す、パース不要) */

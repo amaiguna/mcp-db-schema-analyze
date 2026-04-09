@@ -198,6 +198,68 @@ describe("prepareSql - 複数ファイルに分散したDDLの統合", () => {
 });
 
 // ---------------------------------------------------------------------------
+// meta.json の出力
+//
+// prepare 実行時に DDL のテーブルコメント (COMMENT ON TABLE) を収集し、
+// テーブル名→コメントのマッピングを meta.json として出力することを検証する。
+// これにより MCP 起動時にパース不要でテーブルの論理名を参照できるようになる。
+// ---------------------------------------------------------------------------
+
+describe("prepareSql - meta.json の出力", () => {
+	beforeEach(() => {
+		fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
+	});
+
+	afterEach(() => {
+		fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });
+	});
+
+	it("prepare 実行後に meta.json が出力される", async () => {
+		await prepareSql({
+			inputDirs: [`${FIXTURES_DIR}/mixed`],
+			outputDir: OUTPUT_DIR,
+		});
+
+		expect(fs.existsSync(path.join(OUTPUT_DIR, "meta.json"))).toBe(true);
+	});
+
+	it("meta.json にテーブル名とコメントのマッピングが含まれる", async () => {
+		await prepareSql({
+			inputDirs: [`${FIXTURES_DIR}/mixed`],
+			outputDir: OUTPUT_DIR,
+		});
+
+		const meta = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, "meta.json"), "utf-8"));
+		// mixed/all.sql には COMMENT ON TABLE users IS 'ユーザーテーブル' がある
+		expect(meta.tables.users.comment).toBe("ユーザーテーブル");
+	});
+
+	it("COMMENT ON TABLE がないテーブルは comment: null", async () => {
+		await prepareSql({
+			inputDirs: [`${FIXTURES_DIR}/mixed`],
+			outputDir: OUTPUT_DIR,
+		});
+
+		const meta = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, "meta.json"), "utf-8"));
+		// orders には COMMENT ON TABLE がない
+		expect(meta.tables.orders.comment).toBeNull();
+	});
+
+	it("複数ファイル分散時もコメントが正しく収集される", async () => {
+		await prepareSql({
+			inputDirs: [`${FIXTURES_DIR}/multi-file`],
+			outputDir: OUTPUT_DIR,
+		});
+
+		const meta = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, "meta.json"), "utf-8"));
+		// comments.sql に COMMENT ON TABLE users IS 'ユーザー管理テーブル' 等がある
+		expect(meta.tables.users.comment).toBe("ユーザー管理テーブル");
+		expect(meta.tables.orders.comment).toBe("注文テーブル");
+		expect(meta.tables.order_items.comment).toBe("注文明細テーブル");
+	});
+});
+
+// ---------------------------------------------------------------------------
 // 空SQLファイルのスキップ
 //
 // 空ファイルやコメントのみのファイルが混在しても、エラーにならず

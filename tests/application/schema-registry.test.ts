@@ -141,4 +141,28 @@ describe("SchemaRegistry", () => {
 			expect(registry.getMasterDataTables()).toEqual([]);
 		});
 	});
+
+	// === テーブルメタ情報 (meta.json) ===
+
+	describe("getTableMeta - テーブルメタ情報の即時参照", () => {
+		it("meta.json が存在すればテーブルメタ情報を即座に取得できる", () => {
+			// fixtures/ 直下に meta.json を配置
+			const registry = new SchemaRegistry([DDL_DIR, DML_DIR]);
+
+			const meta = registry.getTableMeta();
+			expect(meta).toBeDefined();
+			expect(meta?.tables.users.comment).toBe("ユーザー管理テーブル");
+			expect(meta?.tables.orders.comment).toBe("注文テーブル");
+			expect(meta?.tables.roles.comment).toBe("ロールマスタ");
+		});
+
+		it("meta.json が存在しなくても起動できる (後方互換)", () => {
+			// meta.json が存在しないディレクトリ構成でもエラーにならない
+			const noMetaDdlDir = new URL("../fixtures/no-meta/ddl", import.meta.url).pathname;
+			const registry = new SchemaRegistry([noMetaDdlDir]);
+
+			const meta = registry.getTableMeta();
+			expect(meta).toBeNull();
+		});
+	});
 });

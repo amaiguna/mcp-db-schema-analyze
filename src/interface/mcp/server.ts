@@ -10,6 +10,17 @@ export function createMcpServer(sqlDirs: string[]): McpServer {
 		version: "0.1.0",
 	});
 
+	// --- get-table-meta ---
+	server.tool("get-table-meta", "テーブル名と論理名(コメント)のマッピングを返す", async () => {
+		const meta = registry.getTableMeta();
+		if (!meta) {
+			return {
+				content: [{ type: "text", text: "meta.json が見つかりません。prepare を実行してください" }],
+			};
+		}
+		return { content: [{ type: "text", text: JSON.stringify(meta, null, 2) }] };
+	});
+
 	// --- list-tables ---
 	server.tool("list-tables", "テーブル一覧を返す", async () => {
 		const names = registry.getTableNames();

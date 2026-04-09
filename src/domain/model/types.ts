@@ -47,3 +47,11 @@ export interface SharedColumn {
 	columnName: string;
 	tables: string[];
 }
+
+export interface TableMetaEntry {
+	comment: string | null;
+}
+
+export interface TableMeta {
+	tables: Record<string, TableMetaEntry>;
+}

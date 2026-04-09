@@ -1,0 +1,7 @@
+{
+	"tables": {
+		"users": { "comment": "ユーザー管理テーブル" },
+		"orders": { "comment": "注文テーブル" },
+		"roles": { "comment": "ロールマスタ" }
+	}
+}
