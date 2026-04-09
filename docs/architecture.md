@@ -195,6 +195,39 @@ pgsql-parser のAST構造はドメインモデルと一致しない。
 MCP tools は薄いアダプタ。SchemaRegistry のメソッドを呼んで整形するだけ。
 ビジネスロジックは domain と application に閉じる。
 
+## 将来構想: プロジェクト固有ツールの拡張
+
+現状は汎用的なスキーマ解析機能のみを提供しているが、
+将来的にはプロジェクト固有のMCPツールを追加したくなるケースが想定される。
+
+### 方針
+
+- **domain層**: `domain/projects/<project-name>/` のようにディレクトリを切り、共通ドメイン (`domain/model/`) とは隔離する。プロジェクト固有の型・ロジックが共通ドメインを汚染しないようにする
+- **application層**: 同様に `application/projects/<project-name>/` で固有ユースケースを配置
+- **interface層**: プロジェクト固有ツールを個別のモジュールとして定義し、MCPサーバー初期化時にロードするツールセットを差し替え可能にする。ツールの登録を追加・削除するだけでプロジェクト固有機能の付け替えができる構造にする
+
+### イメージ
+
+```
+src/
+  domain/
+    model/                    -- 共通ドメイン (現状)
+    projects/
+      project-a/              -- PJ-A 固有のドメインモデル
+  application/
+    schema-registry.ts        -- 共通 (現状)
+    projects/
+      project-a/              -- PJ-A 固有のユースケース
+  interface/
+    mcp/
+      server.ts               -- 共通ツール登録 (現状)
+      tools/
+        project-a.ts          -- PJ-A 固有ツールの登録関数
+```
+
+設定や環境変数でロード対象のプロジェクトツールを切り替えれば、
+同一コードベースから異なるツールセットのMCPサーバーを構成できる。
+
 ## テスト方針
 
 ```
